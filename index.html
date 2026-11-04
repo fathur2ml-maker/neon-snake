@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEON SNAKE</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #080d18;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 20px 12px;
+}
+
+h1 {
+  color: #00ffae;
+  letter-spacing: 4px;
+  text-shadow: 0 0 15px #00ffae;
+}
+
+.subtitle {
+  color: #91a4b8;
+  font-size: 13px;
+}
+
+.panel {
+  max-width: 420px;
+  margin: 20px auto;
+  background: #111c2d;
+  padding: 15px;
+  border-radius: 18px;
+  border: 1px solid #253951;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 15px;
+}
+
+.stat {
+  background: #1a2b40;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+.stat small {
+  display: block;
+  color: #8ca4bb;
+  margin-bottom: 5px;
+}
+
+.stat strong {
+  color: #00ffae;
+  font-size: 23px;
+}
+
+#board {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #07111d;
+  border: 2px solid #00ffae;
+  box-shadow: 0 0 15px #00ffae55;
+  border-radius: 8px;
+  touch-action: none;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 20px;
+  background: #00ffae;
+  color: #06140f;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  margin: 5px;
+}
+
+button:active {
+  transform: scale(.94);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, 65px);
+  justify-content: center;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.controls button {
+  height: 55px;
+  padding: 0;
+  font-size: 24px;
+}
+
+.empty {
+  visibility: hidden;
+}
+
+#message {
+  color: #00ffae;
+  min-height: 22px;
+  font-size: 14px;
+}
+
+.instructions {
+  color: #91a4b8;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>NEON SNAKE</h1>
+<p class="subtitle">ARCADE CLASSIC • FUTURE EDITION</p>
+
+<div class="panel">
+
+  <div class="stats">
+    <div class="stat">
+      <small>SCORE</small>
+      <strong id="score">0</strong>
+    </div>
+
+    <div class="stat">
+      <small>BEST</small>
+      <strong id="best">0</strong>
+    </div>
+  </div>
+
+  <canvas id="board" width="400" height="400"></canvas>
+
+  <p id="message">Tekan MULAI untuk bermain!</p>
+
+  <button onclick="startGame()">▶ MULAI</button>
+  <button onclick="resetGame()">↻ ULANGI</button>
+
+  <div class="controls">
+    <button class="empty"> </button>
+    <button onclick="changeDirection('up')">▲</button>
+    <button class="empty"> </button>
+
+    <button onclick="changeDirection('left')">◀</button>
+    <button onclick="changeDirection('down')">▼</button>
+    <button onclick="changeDirection('right')">▶</button>
+  </div>
+
+  <div class="instructions">
+    <b>CARA BERMAIN</b><br>
+    Gunakan tombol arah atau keyboard untuk bergerak.<br>
+    Makan makanan merah untuk menambah skor.<br>
+    Jangan menabrak dinding atau tubuh ular sendiri!
+  </div>
+
+</div>
+
+<script>
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
+
+const size = 20;
+const total = 20;
+
+let snake;
+let food;
+let direction;
+let nextDirection;
+let score;
+let best = Number(localStorage.getItem("snakeBest")) || 0;
+let timer = null;
+let running = false;
+let gameEnded = false;
+
+document.getElementById("best").textContent = best;
+
+function initGame() {
+  snake = [
+    {x: 8, y: 10},
+    {x: 7, y: 10},
+    {x: 6, y: 10}
+  ];
+
+  direction = "right";
+  nextDirection = "right";
+  score = 0;
+
+  placeFood();
+  updateScore();
+  draw();
+}
+
+function placeFood() {
+  do {
+    food = {
+      x: Math.floor(Math.random() * total),
+      y: Math.floor(Math.random() * total)
+    };
+  } while (
+    snake.some(part =>
+      part.x === food.x && part.y === food.y
+    )
+  );
+}
+
+function updateScore() {
+  document.getElementById("score").textContent = score;
+
+  if (score > best) {
+    best = score;
+    localStorage.setItem("snakeBest", best);
+    document.getElementById("best").textContent = best;
+  }
+}
+
+function draw() {
+  const cell = canvas.width / total;
+
+  ctx.fillStyle = "#07111d";
+  ctx.fillRect(0, 0, 400, 400);
+
+  // Grid
+  ctx.strokeStyle = "#142438";
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= total; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * cell, 0);
+    ctx.lineTo(i * cell, 400);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, i * cell);
+    ctx.lineTo(400, i * cell);
+    ctx.stroke();
+  }
+
+  // Food
+  ctx.fillStyle = "#ff416c";
+  ctx.shadowColor = "#ff416c";
+  ctx.shadowBlur = 15;
+
+  ctx.beginPath();
+  ctx.arc(
+    food.x * cell + cell / 2,
+    food.y * cell + cell / 2,
+    cell * .35,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  // Snake
+  snake.forEach((part, index) => {
+    ctx.fillStyle = index === 0 ? "#ffffff" : "#00ffae";
+    ctx.shadowColor = "#00ffae";
+    ctx.shadowBlur = 12;
+
+    ctx.fillRect(
+      part.x * cell + 2,
+      part.y * cell + 2,
+      cell - 4,
+      cell - 4
+    );
+  });
+
+  ctx.shadowBlur = 0;
+}
+
+function changeDirection(newDirection) {
+  const opposite = {
+    up: "down",
+    down: "up",
+    left: "right",
+    right: "left"
+  };
+
+  if (opposite[newDirection] !== direction) {
+    nextDirection = newDirection;
+  }
+}
+
+function move() {
+  if (!running) return;
+
+  direction = nextDirection;
+
+  const head = {...snake[0]};
+
+  if (direction === "up") head.y--;
+  if (direction === "down") head.y++;
+  if (direction === "left") head.x--;
+  if (direction === "right") head.x++;
+
+  // Tembok
+  if (
+    head.x < 0 ||
+    head.x >= total ||
+    head.y < 0 ||
+    head.y >= total
+  ) {
+    endGame();
+    return;
+  }
+
+  const eating =
+    head.x === food.x && head.y === food.y;
+
+  // Tabrakan dengan badan
+  const body = eating ? snake : snake.slice(0, -1);
+
+  if (body.some(part =>
+    part.x === head.x && part.y === head.y
+  )) {
+    endGame();
+    return;
+  }
+
+  snake.unshift(head);
+
+  if (eating) {
+    score += 10;
+    updateScore();
+    placeFood();
+
+    document.getElementById("message").textContent =
+      "Mantap! +10 poin";
+  } else {
+    snake.pop();
+  }
+
+  draw();
+}
+
+function startGame() {
+  if (running) return;
+
+  if (gameEnded) initGame();
+
+  running = true;
+  gameEnded = false;
+
+  document.getElementById("message").textContent =
+    "Game dimulai! Semangat!";
+
+  clearInterval(timer);
+  timer = setInterval(move, Math.max(65, 140 - score / 5));
+}
+
+function endGame() {
+  running = false;
+  gameEnded = true;
+  clearInterval(timer);
+
+  document.getElementById("message").textContent =
+    "GAME OVER! Skor kamu: " + score;
+
+  draw();
+}
+
+function resetGame() {
+  clearInterval(timer);
+  running = false;
+  gameEnded = false;
+  initGame();
+
+  document.getElementById("message").textContent =
+    "Tekan MULAI untuk bermain!";
+}
+
+document.addEventListener("keydown", function(e) {
+  const keys = {
+    ArrowUp: "up",
+    ArrowDown: "down",
+    ArrowLeft: "left",
+    ArrowRight: "right",
+    w: "up",
+    s: "down",
+    a: "left",
+    d: "right"
+  };
+
+  if (keys[e.key]) {
+    e.preventDefault();
+    changeDirection(keys[e.key]);
+  }
+
+  if (e.key === " " && !running) {
+    startGame();
+  }
+});
+
+// Swipe untuk HP
+let touchStartX = 0;
+let touchStartY = 0;
+
+canvas.addEventListener("touchstart", function(e) {
+  const touch = e.touches[0];
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+}, {passive: true});
+
+canvas.addEventListener("touchend", function(e) {
+  const touch = e.changedTouches[0];
+
+  const dx = touch.clientX - touchStartX;
+  const dy = touch.clientY - touchStartY;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (Math.abs(dx) > 15) {
+      changeDirection(dx > 0 ? "right" : "left");
+    }
+  } else {
+    if (Math.abs(dy) > 15) {
+      changeDirection(dy > 0 ? "down" : "up");
+    }
+  }
+}, {passive: true});
+
+initGame();
+</script>
+
+</body>
+</html>
